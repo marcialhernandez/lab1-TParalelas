@@ -1,8 +1,75 @@
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *
+ * Copyright (C) Marcial Hernandez Sanchez, 2015
+ * University of Santiago, Chile (Usach) 
+ */
+//C
 #include <stdio.h>
+#include <unistd.h>
+//File descriptors from sys - C
+#include <sys/types.h>
+#include <sys/stat.h>
+//System tools to open and write - C
+#include <fcntl.h>
+//SSE
 #include <pmmintrin.h>
 #include <emmintrin.h> 
 #include <xmmintrin.h> 
+//C++
+#include <iostream>
 
+using namespace std;
+
+//Funcion no utilizada, reserva de memoria alineada
+/*float *foo(void) {
+   float *var;//create array of size 10
+   int     ok;
+ 
+   ok = posix_memalign((void**)&var, 16, 10*sizeof(float));
+ 
+   if(ok != 0)
+     return NULL;
+ 
+   return var;
+}*/
+
+void sysRead(string nombreEntrada,float **lista){
+	int fd = open(nombreEntrada.c_str(), O_RDONLY);
+	better:
+	if ( (fd = open(nombreEntrada.c_str(), O_RDONLY) ) == -1)
+		{
+			cout << "Error: can't open file" << endl;
+			exit(1);
+		}
+
+	else{
+		struct stat buf;
+		fstat(fd, &buf);
+		int size = buf.st_size;
+		float line[size];
+		int n = read(fd, &line, size);
+		cout << "cantidadDatos: "<< size << endl;
+		cout << "Actual # bytes read = " << n << endl;
+		cout << "Data read = '" << line[1023] << "'" << endl;
+
+		close(fd);
+
+	}
+
+}
 
 // Sea A0, A1, A2, A3 y B0, B1, B2, B3
 // Retorna A0 B0 A1 B1
@@ -100,45 +167,45 @@ void mergeSIMD(__m128 * entrada1,__m128 * entrada2, __m128 * entrada3,__m128 * e
 	}
 };
 
+void sortKernel(__m128 * entrada1,__m128 * entrada2, __m128 * entrada3,__m128 * entrada4){
+	inRegisterSort(entrada1,entrada2,entrada3,entrada4);
+//Luego se obtienen 2 conjuntos (de 8) ordenados usando la BMN 2 veces
+	secondReverseBMN(entrada1, entrada2);
+	secondReverseBMN(entrada3, entrada4);
+	//Luego se utiliza MergeSimd con los dos conjuntos de 8
+	mergeSIMD(entrada1,entrada3,entrada2,entrada4);
+}
+
 int main( )
 {
-__m128 entrada1 , entrada2, entrada3, entrada4;
+	float *lista;
+	sysRead("1024num.txt",&lista);
 
-//Test de la funcion bitonicMergeNetwork
-//float a[4] __attribute__((aligned(16))) = {  4, 12, 13,21};
-//float b[4] __attribute__((aligned(16))) = { 9, 8, 7,6 };
+// __m128 entrada1 , entrada2, entrada3, entrada4;
 
+// float a[4] __attribute__((aligned(16))) = {  18, 6, 4,13};
 
-float a[4] __attribute__((aligned(16))) = {  12, 21, 4,13};
+// float b[4] __attribute__((aligned(16))) = { 37, 8, 12,7 };
 
-float b[4] __attribute__((aligned(16))) = { 9, 8, 6,7 };
+// float c[4] __attribute__((aligned(16))) = {  1, 15, 3,45};
 
-float c[4] __attribute__((aligned(16))) = {  1, 14, 3,0};
+// float d[4] __attribute__((aligned(16))) = { 2, 31, 9,10 };
 
-float d[4] __attribute__((aligned(16))) = { 5, 11, 15,10 };
+// entrada1 = _mm_load_ps(a);
+// entrada2 = _mm_load_ps(b);
+// entrada3 = _mm_load_ps(c);
+// entrada4 = _mm_load_ps(d);
 
-entrada1 = _mm_load_ps(a);
-entrada2 = _mm_load_ps(b);
-entrada3 = _mm_load_ps(c);
-entrada4 = _mm_load_ps(d);
+// sortKernel(&entrada1,&entrada2,&entrada3,&entrada4);
 
-//Procedimiento algoritmo
-//Con entradas de 4 en 4
-inRegisterSort(&entrada1,&entrada2,&entrada3,&entrada4);
-//Luego se obtienen 2 conjuntos (de 8) ordenados usando la BMN 2 veces
-secondReverseBMN(&entrada1, &entrada2);
-secondReverseBMN(&entrada3, &entrada4);
-//Luego se utiliza MergeSimd con los dos conjuntos de 8
-mergeSIMD(&entrada1,&entrada3,&entrada2,&entrada4);
+// //El merge SIMD ordenada pero deja el segundo y tercer registro intercambiados
+// _mm_store_ps(a, entrada1);
+// _mm_store_ps(c, entrada2);
+// _mm_store_ps(b, entrada3);
+// _mm_store_ps(d, entrada4);
 
-//El merge SIMD ordenada pero deja el segundo y tercer registro intercambiados
-_mm_store_ps(a, entrada1);
-_mm_store_ps(c, entrada2);
-_mm_store_ps(b, entrada3);
-_mm_store_ps(d, entrada4);
-
-printf("Result: %5.f %5.f %5.f %5.f\n", a[0], a[1], a[2], a[3] );
-printf("Result: %5.f %5.f %5.f %5.f\n", b[0], b[1], b[2], b[3] );
-printf("Result: %5.f %5.f %5.f %5.f\n", c[0], c[1], c[2], c[3] );
-printf("Result: %5.f %5.f %5.f %5.f\n", d[0], d[1], d[2], d[3] );
+// printf("Result: %5.f %5.f %5.f %5.f\n", a[0], a[1], a[2], a[3] );
+// printf("Result: %5.f %5.f %5.f %5.f\n", b[0], b[1], b[2], b[3] );
+// printf("Result: %5.f %5.f %5.f %5.f\n", c[0], c[1], c[2], c[3] );
+// printf("Result: %5.f %5.f %5.f %5.f\n", d[0], d[1], d[2], d[3] );
 }
