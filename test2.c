@@ -203,7 +203,7 @@ void sortKernel(__m128 * entrada1,__m128 * entrada2, __m128 * entrada3,__m128 * 
 	mergeSIMD(entrada1,entrada3,entrada2,entrada4);
 }
 
-void carga(float * a, float *b, float * c, float * d){
+void loadSortKernel(float * a, float *b, float * c, float * d){
 	__m128 entrada1 = _mm_load_ps(a);
 	__m128 entrada2 = _mm_load_ps(b);
 	__m128 entrada3 = _mm_load_ps(c);
@@ -221,28 +221,84 @@ void carga(float * a, float *b, float * c, float * d){
 	//cout << c[0] << c[1] << c[2] << c[3] << endl;
 	//cout << d[0] << d[1] << d[2] << d[3] << endl;
 }
-// __m128 entrada1 , entrada2, entrada3, entrada4;
 
-// float a[4] __attribute__((aligned(16))) = {  18, 6, 4,13};
+/**
+ * merge() 
+ * Merge two sorted arrays, A with a  integers and 
+ * B with b integers, into a sorted array C.
+ * Fuente = http://www.cs.cityu.edu.hk/~lwang/ccs4335/mergesort.c
+ **/
 
-// float b[4] __attribute__((aligned(16))) = { 37, 8, 12,7 };
+ void  merge(float *A, int a, float *B, int b, float *C) {
+  int i,j,k;
+  i = 0; 
+  j = 0;
+  k = 0;
+  while (i < a && j < b) {
+    if (A[i] <= B[j]) {
+	  /* copy A[i] to C[k] and move the pointer i and k forward */
+	  C[k] = A[i];
+	  i++;
+	  k++;
+    }
+    else {
+      /* copy B[j] to C[k] and move the pointer j and k forward */
+      C[k] = B[j];
+      j++;
+      k++;
+    }
+  }
+  /* move the remaining elements in A into C */
+  while (i < a) {
+    C[k]= A[i];
+    i++;
+    k++;
+  }
+  /* move the remaining elements in B into C */
+  while (j < b)  {
+    C[k]= B[j];
+    j++;
+    k++;
+  }
+}  
 
-// float c[4] __attribute__((aligned(16))) = {  1, 15, 3,45};
+/**
+ * merge_sort()
+ * Sort array A with n integers, using merge-sort algorithm.
+ **/
+void merge_sort(float *A, int n) {
+  int i;
+  float *A1, *A2;
+  int n1, n2;
 
-// float d[4] __attribute__((aligned(16))) = { 2, 31, 9,10 };
+  if (n < 2)
+    return;   /* the array is sorted when n=1.*/
+  
+  /* divide A into two array A1 and A2 */
+  n1 = n / 2;   /* the number of elements in A1 */
+  n2 = n - n1;  /* the number of elements in A2 */
 
-// entrada1 = _mm_load_ps(a);
-// entrada2 = _mm_load_ps(b);
-// entrada3 = _mm_load_ps(c);
-// entrada4 = _mm_load_ps(d);
+  //Se multiplica por 4 para que queden alineados a 16
+  A1 = (float*)malloc(sizeof(float)*4 * n1);
+  A2 = (float*)malloc(sizeof(float)*4 * n2);
+  
+  /* move the first n/2 elements to A1 */
+  for (i =0; i < n1; i++) {
+    A1[i] = A[i];
+  }
+  /* move the rest to A2 */
+  for (i = 0; i < n2; i++) {
+    A2[i] = A[i+n1];
+  }
+  /* recursive call */
+  merge_sort(A1, n1);
+  merge_sort(A2, n2);
 
-// sortKernel(&entrada1,&entrada2,&entrada3,&entrada4);
-
-// //El merge SIMD ordenada pero deja el segundo y tercer registro intercambiados
-// _mm_store_ps(a, entrada1);
-// _mm_store_ps(c, entrada2);
-// _mm_store_ps(b, entrada3);
-// _mm_store_ps(d, entrada4);
+  /* conquer */
+  merge(A1, n1, A2, n2, A);
+  free(A1);
+  free(A2);
+}
 
 int main( )
 {
@@ -260,38 +316,12 @@ int main( )
 		offset=i*16;
 		//Para acceder a una parte del registro
 		//_mm_load_ps(&line[offset]);
-		carga(&line[offset], &line[offset+4], &line[offset+8], &line[offset+12]);
+		loadSortKernel(&line[offset], &line[offset+4], &line[offset+8], &line[offset+12]);
 	}
+	merge_sort(line, size*16);
 
-
-
-
-
-// __m128 entrada1 , entrada2, entrada3, entrada4;
-
-// float a[4] __attribute__((aligned(16))) = {  18, 6, 4,13};
-
-// float b[4] __attribute__((aligned(16))) = { 37, 8, 12,7 };
-
-// float c[4] __attribute__((aligned(16))) = {  1, 15, 3,45};
-
-// float d[4] __attribute__((aligned(16))) = { 2, 31, 9,10 };
-
-// entrada1 = _mm_load_ps(a);
-// entrada2 = _mm_load_ps(b);
-// entrada3 = _mm_load_ps(c);
-// entrada4 = _mm_load_ps(d);
-
-// sortKernel(&entrada1,&entrada2,&entrada3,&entrada4);
-
-// //El merge SIMD ordenada pero deja el segundo y tercer registro intercambiados
-// _mm_store_ps(a, entrada1);
-// _mm_store_ps(c, entrada2);
-// _mm_store_ps(b, entrada3);
-// _mm_store_ps(d, entrada4);
-
-// printf("Result: %5.f %5.f %5.f %5.f\n", a[0], a[1], a[2], a[3] );
-// printf("Result: %5.f %5.f %5.f %5.f\n", b[0], b[1], b[2], b[3] );
-// printf("Result: %5.f %5.f %5.f %5.f\n", c[0], c[1], c[2], c[3] );
-// printf("Result: %5.f %5.f %5.f %5.f\n", d[0], d[1], d[2], d[3] );
+	//Debug
+	for (int i=0; i<size*16; i++){
+		cout << line[i] << endl;
+	}
 }
