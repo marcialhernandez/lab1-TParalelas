@@ -33,42 +33,69 @@
 
 using namespace std;
 
-//Funcion no utilizada, reserva de memoria alineada
-/*float *foo(void) {
-   float *var;//create array of size 10
-   int     ok;
- 
-   ok = posix_memalign((void**)&var, 16, 10*sizeof(float));
- 
-   if(ok != 0)
-     return NULL;
- 
-   return var;
-}*/
-
-void sysRead(string nombreEntrada,float **lista){
+//Igual que sysRead, pero deja alineado de a 16 usando posix_memalign
+//Ya que malloc deja alineado de a 8
+float * sysReadAligned(string nombreEntrada, int * size){
 	int fd = open(nombreEntrada.c_str(), O_RDONLY);
 	better:
 	if ( (fd = open(nombreEntrada.c_str(), O_RDONLY) ) == -1)
 		{
-			cout << "Error: can't open file" << endl;
+			cout << "Error: no se puede abrir el archivo" << endl;
 			exit(1);
 		}
 
 	else{
 		struct stat buf;
 		fstat(fd, &buf);
-		int size = buf.st_size;
-		float line[size];
-		int n = read(fd, &line, size);
-		cout << "cantidadDatos: "<< size << endl;
-		cout << "Actual # bytes read = " << n << endl;
-		cout << "Data read = '" << line[1023] << "'" << endl;
-
-		close(fd);
-
+		*size = buf.st_size;
+		if (*size%16 !=0){
+			cout << "Error: cantidad de datos invalidos (no es multiplo de 16)" << endl;
+			exit(1);
+		}
+		else{
+			//float line[size];
+			//float *line=(float *) malloc(*size);
+			float *line;
+			posix_memalign((void**)&line, 16, *size);
+			int n = read(fd, line, *size);
+			close(fd);
+			//cada registro contiene 4 numero flotantes
+			*size=*size/4;
+			return line;
+		}
 	}
+}
 
+
+//Retorna la lista con todos los numeros cargados tipo float
+//Ademas actualiza el valor de entrada size por la cantidad de registros de 128 de la entrada
+float * sysRead(string nombreEntrada, int * size){
+	int fd = open(nombreEntrada.c_str(), O_RDONLY);
+	better:
+	if ( (fd = open(nombreEntrada.c_str(), O_RDONLY) ) == -1)
+		{
+			cout << "Error: no se puede abrir el archivo" << endl;
+			exit(1);
+		}
+
+	else{
+		struct stat buf;
+		fstat(fd, &buf);
+		*size = buf.st_size;
+		if (*size%16 !=0){
+			cout << "Error: cantidad de datos invalidos (no es multiplo de 16)" << endl;
+			exit(1);
+		}
+		else{
+			//float line[size];
+			float *line=(float *) malloc(*size);
+			int n = read(fd, line, *size);
+			close(fd);
+			//cada registro contiene 4 numero flotantes
+			*size=*size/4;
+			return line;
+		}
+	}
 }
 
 // Sea A0, A1, A2, A3 y B0, B1, B2, B3
@@ -178,8 +205,27 @@ void sortKernel(__m128 * entrada1,__m128 * entrada2, __m128 * entrada3,__m128 * 
 
 int main( )
 {
-	float *lista;
-	sysRead("1024num.txt",&lista);
+	int size=0;
+	//float *line =sysRead("1024num.txt",&size);
+	float *line =sysReadAligned("1024num.txt",&size);
+
+	//debug
+	cout << "Data read = '" << line[0] << "'" << endl;
+	cout << "cantidadRegistros: "<< size << endl;
+	int offset;
+	//Se divide en 16 pues se visitan de a 16 
+	size=size/16;
+	for (int i=0;i<size;i++){
+		offset=i*16;
+		//debug
+		//cout << line[offset] << " " << line[offset+1] << " " << line[offset+2] << " " << line[offset+3] << " " << line[offset+4] << " " << line[offset+5] << " " << line[offset+6] << " " << line[offset+7]
+		//<<line[offset+8] << " " << line[offset+9] << " " << line[offset+10] << " " << line[offset+11] << " " << line[offset+12] << " " << line[offset+13] << " " << line[offset+14] << " " << line[offset+15] << endl;
+		//float a[4]={*&line[offset],*&line[offset+1],*&line[offset+2],*&line[offset+3]};
+		//cout << *a << endl;
+	}
+
+
+
 
 // __m128 entrada1 , entrada2, entrada3, entrada4;
 
