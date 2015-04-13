@@ -203,6 +203,47 @@ void sortKernel(__m128 * entrada1,__m128 * entrada2, __m128 * entrada3,__m128 * 
 	mergeSIMD(entrada1,entrada3,entrada2,entrada4);
 }
 
+void carga(float * a, float *b, float * c, float * d){
+	__m128 entrada1 = _mm_load_ps(a);
+	__m128 entrada2 = _mm_load_ps(b);
+	__m128 entrada3 = _mm_load_ps(c);
+	__m128 entrada4 = _mm_load_ps(d);
+
+	sortKernel(&entrada1,&entrada2,&entrada3,&entrada4);
+
+	_mm_store_ps(a, entrada1);
+	_mm_store_ps(c, entrada2);
+	_mm_store_ps(b, entrada3);
+	_mm_store_ps(d, entrada4);
+
+	//cout << a[0] << a[1] << a[2] << a[3] << endl;
+	//cout << b[0] << b[1] << b[2] << b[3] << endl;
+	//cout << c[0] << c[1] << c[2] << c[3] << endl;
+	//cout << d[0] << d[1] << d[2] << d[3] << endl;
+}
+// __m128 entrada1 , entrada2, entrada3, entrada4;
+
+// float a[4] __attribute__((aligned(16))) = {  18, 6, 4,13};
+
+// float b[4] __attribute__((aligned(16))) = { 37, 8, 12,7 };
+
+// float c[4] __attribute__((aligned(16))) = {  1, 15, 3,45};
+
+// float d[4] __attribute__((aligned(16))) = { 2, 31, 9,10 };
+
+// entrada1 = _mm_load_ps(a);
+// entrada2 = _mm_load_ps(b);
+// entrada3 = _mm_load_ps(c);
+// entrada4 = _mm_load_ps(d);
+
+// sortKernel(&entrada1,&entrada2,&entrada3,&entrada4);
+
+// //El merge SIMD ordenada pero deja el segundo y tercer registro intercambiados
+// _mm_store_ps(a, entrada1);
+// _mm_store_ps(c, entrada2);
+// _mm_store_ps(b, entrada3);
+// _mm_store_ps(d, entrada4);
+
 int main( )
 {
 	int size=0;
@@ -217,12 +258,11 @@ int main( )
 	size=size/16;
 	for (int i=0;i<size;i++){
 		offset=i*16;
-		//debug
-		//cout << line[offset] << " " << line[offset+1] << " " << line[offset+2] << " " << line[offset+3] << " " << line[offset+4] << " " << line[offset+5] << " " << line[offset+6] << " " << line[offset+7]
-		//<<line[offset+8] << " " << line[offset+9] << " " << line[offset+10] << " " << line[offset+11] << " " << line[offset+12] << " " << line[offset+13] << " " << line[offset+14] << " " << line[offset+15] << endl;
-		//float a[4]={*&line[offset],*&line[offset+1],*&line[offset+2],*&line[offset+3]};
-		//cout << *a << endl;
+		//Para acceder a una parte del registro
+		//_mm_load_ps(&line[offset]);
+		carga(&line[offset], &line[offset+4], &line[offset+8], &line[offset+12]);
 	}
+
 
 
 
