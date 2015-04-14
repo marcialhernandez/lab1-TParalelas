@@ -49,7 +49,7 @@ void sysWrite(string nombreSalida, float * bufferAEscribir, int nBytesToWrite){
 		}
 
 	else{
-		int n =write(  fd, bufferAEscribir, nBytesToWrite);
+		write(  fd, bufferAEscribir, nBytesToWrite);
 		close(fd);
 	}
 }
@@ -58,7 +58,6 @@ void sysWrite(string nombreSalida, float * bufferAEscribir, int nBytesToWrite){
 //Y su segundo argumento es la cantidad de numeros que debe leer
 float * sysReadAligned(string nombreEntrada, int * readSize){
 	int fd = open(nombreEntrada.c_str(), O_RDONLY);
-	better:
 	if ( (fd = open(nombreEntrada.c_str(), O_RDONLY) ) == -1)
 		{
 			cout << "Error: no se puede abrir el archivo" << endl;
@@ -84,7 +83,7 @@ float * sysReadAligned(string nombreEntrada, int * readSize){
 			float *line;
 			//size de lectura * 4 pues cada elemento de la lista se compone de 4 bytes
 			posix_memalign((void**)&line, 16, *readSize*4);
-			int n = read(fd, line, *readSize*4);
+			read(fd, line, *readSize*4);
 			close(fd);
 			//cada registro contiene 4 numero flotantes
 			//*size=*size/4;
@@ -97,7 +96,6 @@ float * sysReadAligned(string nombreEntrada, int * readSize){
 //Ademas actualiza el valor de entrada size por la cantidad de registros de 128 de la entrada
 float * sysRead(string nombreEntrada, int * size){
 	int fd = open(nombreEntrada.c_str(), O_RDONLY);
-	better:
 	if ( (fd = open(nombreEntrada.c_str(), O_RDONLY) ) == -1)
 		{
 			cout << "Error: no se puede abrir el archivo" << endl;
@@ -115,7 +113,7 @@ float * sysRead(string nombreEntrada, int * size){
 		else{
 			//float line[size];
 			float *line=(float *) malloc(*size);
-			int n = read(fd, line, *size);
+			read(fd, line, *size);
 			close(fd);
 			//cada registro contiene 4 numero flotantes
 			*size=*size/4;
