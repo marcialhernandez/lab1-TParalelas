@@ -16,6 +16,8 @@
  * Copyright (C) Marcial Hernandez Sanchez, 2015
  * University of Santiago, Chile (Usach) 
  */
+
+/////////////////////////////////////////
 //C
 #include <stdio.h>
 #include <unistd.h>
@@ -30,6 +32,7 @@
 #include <xmmintrin.h> 
 //C++
 #include <iostream>
+/////////////////////////////////////////
 
 using namespace std;
 
@@ -216,6 +219,7 @@ void loadSortKernel(float * a, float *b, float * c, float * d){
 	_mm_store_ps(b, entrada3);
 	_mm_store_ps(d, entrada4);
 
+	//Debug
 	//cout << a[0] << a[1] << a[2] << a[3] << endl;
 	//cout << b[0] << b[1] << b[2] << b[3] << endl;
 	//cout << c[0] << c[1] << c[2] << c[3] << endl;
@@ -271,7 +275,10 @@ void merge_sort(float *A, int n) {
   float *A1, *A2;
   int n1, n2;
 
-  if (n < 2)
+  //Aprovecho el ordenamiento SIMD
+  //Funciona de 32 en 32
+
+  if (n<32)//(n < 2)
     return;   /* the array is sorted when n=1.*/
   
   /* divide A into two array A1 and A2 */
@@ -318,6 +325,7 @@ int main( )
 		//_mm_load_ps(&line[offset]);
 		loadSortKernel(&line[offset], &line[offset+4], &line[offset+8], &line[offset+12]);
 	}
+	//size * 16 ya que es la cantidad total de registros, y no la cantidad total de grupos de 16
 	merge_sort(line, size*16);
 
 	//Debug
