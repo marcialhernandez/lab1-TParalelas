@@ -36,14 +36,31 @@
 
 using namespace std;
 
+void sysWrite(string nombreSalida, float * bufferAEscribir, int nBytesToWrite){
+	int fd = open(nombreSalida.c_str(), O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+	if ( fd <0)
+		{
+			cout << "Error: no se puede abrir el archivo de Salida" << endl;
+			cout << strerror(errno) << endl;
+			exit(1);
+		}
+
+	else{
+		int n =write(  fd, bufferAEscribir, nBytesToWrite);
+		close(fd);
+	}
+}
+
 //Igual que sysRead, pero deja alineado de a 16 usando posix_memalign
 //Ya que malloc deja alineado de a 8
+
 float * sysReadAligned(string nombreEntrada, int * size){
 	int fd = open(nombreEntrada.c_str(), O_RDONLY);
 	better:
 	if ( (fd = open(nombreEntrada.c_str(), O_RDONLY) ) == -1)
 		{
 			cout << "Error: no se puede abrir el archivo" << endl;
+			cout << strerror(errno) << endl;
 			exit(1);
 		}
 
@@ -307,15 +324,16 @@ void merge_sort(float *A, int n) {
   free(A2);
 }
 
-int main( )
+int main()
 {
 	int size=0;
-	//float *line =sysRead("1024num.txt",&size);
-	float *line =sysReadAligned("1024num.txt",&size);
+	string nombreEntrada="1024num.txt";
+	float *line =sysReadAligned(nombreEntrada,&size);
 
 	//debug
-	cout << "Data read = '" << line[0] << "'" << endl;
-	cout << "cantidadRegistros: "<< size << endl;
+	/*cout << "Data read = '" << line[0] << "'" << endl;
+	cout << "cantidadRegistros: "<< size << endl;*/
+
 	int offset;
 	//Se divide en 16 pues se visitan de a 16 
 	size=size/16;
@@ -323,13 +341,19 @@ int main( )
 		offset=i*16;
 		//Para acceder a una parte del registro
 		//_mm_load_ps(&line[offset]);
+		//A cada grupo de 16 se le aplica el sortKernel
 		loadSortKernel(&line[offset], &line[offset+4], &line[offset+8], &line[offset+12]);
 	}
 	//size * 16 ya que es la cantidad total de registros, y no la cantidad total de grupos de 16
 	merge_sort(line, size*16);
 
 	//Debug
-	for (int i=0; i<size*16; i++){
+	/*for (int i=0; i<size*16; i++){
 		cout << line[i] << endl;
-	}
+	}*/
+
+	//Se escribe en el archivo de salida
+	//Considerar que el tamaño es cantidad de grupos de registros, por cantidad de grupos, por cantidad de bytes de cada registro
+	sysWrite("outputSorted.txt", &*line, size*16*4);
+	return 0;
 }
