@@ -32,12 +32,15 @@
 #include <xmmintrin.h> 
 //C++
 #include <iostream>
-/////////////////////////////////////////
 
 using namespace std;
 
+/////////////////////////////////////////
+
+//Funcion que escribe en un archivo de salida de nombre 'nombreSalida'
+//La cantidad 'nBytesToWrite' de datos que contiene el buffer de flotantes 'bufferAEscribir'
 void sysWrite(string nombreSalida, float * bufferAEscribir, int nBytesToWrite){
-	int fd = open(nombreSalida.c_str(), O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+	int fd = open(nombreSalida.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO);
 	if ( fd <0)
 		{
 			cout << "Error: no se puede abrir el archivo de Salida" << endl;
@@ -52,9 +55,8 @@ void sysWrite(string nombreSalida, float * bufferAEscribir, int nBytesToWrite){
 }
 
 //Igual que sysRead, pero deja alineado de a 16 usando posix_memalign
-//Ya que malloc deja alineado de a 8
-
-float * sysReadAligned(string nombreEntrada, int * size){
+//Y su segundo argumento es la cantidad de numeros que debe leer
+float * sysReadAligned(string nombreEntrada, int * readSize){
 	int fd = open(nombreEntrada.c_str(), O_RDONLY);
 	better:
 	if ( (fd = open(nombreEntrada.c_str(), O_RDONLY) ) == -1)
@@ -65,27 +67,31 @@ float * sysReadAligned(string nombreEntrada, int * size){
 		}
 
 	else{
-		struct stat buf;
-		fstat(fd, &buf);
-		*size = buf.st_size;
-		if (*size%16 !=0){
+		//En un principio se obtenia el tamaño total del archivo usando fstat
+		//struct stat buf;
+		//fstat(fd, &buf);
+		//*size = buf.st_size;
+
+		//Ahora la validacion se hace en el getopt
+		/*if (*size%16 !=0){
 			cout << "Error: cantidad de datos invalidos (no es multiplo de 16)" << endl;
 			exit(1);
-		}
-		else{
+		}*/
+
+		//else{
 			//float line[size];
 			//float *line=(float *) malloc(*size);
 			float *line;
-			posix_memalign((void**)&line, 16, *size);
-			int n = read(fd, line, *size);
+			//size de lectura * 4 pues cada elemento de la lista se compone de 4 bytes
+			posix_memalign((void**)&line, 16, *readSize*4);
+			int n = read(fd, line, *readSize*4);
 			close(fd);
 			//cada registro contiene 4 numero flotantes
-			*size=*size/4;
+			//*size=*size/4;
 			return line;
-		}
+		//}
 	}
 }
-
 
 //Retorna la lista con todos los numeros cargados tipo float
 //Ademas actualiza el valor de entrada size por la cantidad de registros de 128 de la entrada
@@ -186,6 +192,7 @@ void inRegisterSort(__m128 * entrada1,__m128 * entrada2, __m128 * entrada3,__m12
 
 };
 
+//Invoca a la BMN, pero revirtiendo los valores del segundo registro
 void secondReverseBMN(__m128 * entrada1,__m128 * entrada2){
 	*entrada2=_mm_shuffle_ps(*entrada2, *entrada2, _MM_SHUFFLE(0,1,2,3));
 	bitonicMergeNetwork(entrada1,entrada2);
@@ -296,7 +303,7 @@ void merge_sort(float *A, int n) {
   //Funciona de 32 en 32
 
   if (n<32)//(n < 2)
-    return;   /* the array is sorted when n=1.*/
+    return;   /* the array is sorted when n=32.*/
   
   /* divide A into two array A1 and A2 */
   n1 = n / 2;   /* the number of elements in A1 */
@@ -324,36 +331,185 @@ void merge_sort(float *A, int n) {
   free(A2);
 }
 
-int main()
-{
-	int size=0;
-	string nombreEntrada="1024num.txt";
-	float *line =sysReadAligned(nombreEntrada,&size);
+//Valida que la entrada sea numerica
+//retorna 0 y guarda la entrada en entradaPrograma si la entrada es numero
+//retorna 1 si hay falla
+int isNumber(const string entradaConsola, int * entradaPrograma ){
+	int largoEntrada=entradaConsola.size();
+	for (int contador=0;contador<largoEntrada;contador++){
+		if (!isdigit(entradaConsola.at(contador))){
+			return 1;
+		}
+	}
 
-	//debug
-	/*cout << "Data read = '" << line[0] << "'" << endl;
-	cout << "cantidadRegistros: "<< size << endl;*/
+	*entradaPrograma=stoi(entradaConsola);
+	return 0;
+}
+
+/* Una cadena que lista las opciones cortas válidas para getOpt
+   Se inicia con : pues si falta algun argumento, enviara un caso tipo ":"" */
+
+const char* const opciones = "d:i:o:N:";
+
+//-i : archivo binario con la lista de entrada desordenados
+//-o : archivo binario de salida con la lista ordenada
+//-N : largo de la lista
+//-d : si debug es 0, no se imprime mensaje alguno por stdout, si es 1, se imprime la secuencia final, 1 por linea
+
+/* Declaracion de las banderas */
+
+int banderaErrorParametros=0, banderaErrorBanderas=0;
+
+//
+int bandera_i=0, bandera_N=0,bandera_o=0, bandera_d=0;
+bool multiplo16=true;
+
+//Las banderas _i, _N, _o y _d: para asegurar que solo haya un argumento
+//Por ejemplo; podria escribir por consola -i entrada1 -i entrada2
+//si pasa esto, se retornara un mensaje de error y se terminara la ejecucion
+
+int main (int argc, char **argv)
+{
+
+	string nombreEntrada, nombreSalida="outputSorted.txt"; //nombre de salida por defecto si no se especifica
+	int largoLista, debug=0, argumentoConsola;
+
+	//////////// Analisis de entrada de la consola getOpt ///////////
+
+	while (((argumentoConsola = getopt (argc, argv, opciones)) != -1) &&  banderaErrorParametros==0 && banderaErrorBanderas==0){
+		//No tiene caso seguir con el while, si se ha detectado una falla en el camino
+		switch (argumentoConsola){  
+
+			case 'i': if (bandera_i==0) { //archivo entrada
+
+					  bandera_i++; 
+
+					  nombreEntrada=optarg;
+
+					}
+					else{
+					banderaErrorBanderas++;						
+					}
+					  break;	  
+			case 'N': if (bandera_N==0) {
+							    bandera_N++;
+							    banderaErrorParametros = banderaErrorParametros + isNumber(optarg, &largoLista );
+							    if (largoLista%16!=0){
+							    	banderaErrorParametros++;
+							    	multiplo16=false;
+							    }
+						    }              
+						    else {
+							    banderaErrorBanderas++;
+						    }
+						    break;
+
+			case 'o': if (bandera_o==0) { //archivo salida
+
+					  bandera_o++; 
+
+					  nombreSalida=optarg;
+
+					}
+					else{
+					banderaErrorBanderas++;						
+					}
+					  break;
+
+			case 'd': if (bandera_d==0) { //archivo
+
+					  bandera_d++; 
+
+					  banderaErrorParametros = banderaErrorParametros + isNumber(optarg, &debug);
+					  if ( debug >1){
+					  	banderaErrorParametros++;
+					  }
+					}
+					else{
+					banderaErrorBanderas++;						
+					}
+					  break;
+
+					  case ':': banderaErrorParametros++; break;
+					  case '?': 
+						    if ((optopt=='i' || optopt=='o' || optopt=='N' || optopt=='d' || optopt=='t')){
+							    banderaErrorParametros++;
+						    }
+						    else{
+							    banderaErrorBanderas++;
+						    }
+						    break;
+					  default: banderaErrorBanderas++; break;
+				  }
+		}
+
+	/////////////////////////////////////////////////////////////////
+
+
+	//////////// Analisis de los argumentos obtenidos de getOpt ///////////
+
+	if (banderaErrorBanderas>0){
+		cout << "Error: una o más opciones estan duplicadas o no estan disponibles" << endl;
+		exit(1);
+	}
+
+	if (bandera_i==0){
+		cout << "Error: no se ha especificado archivo de entrada" << endl;
+		exit(1);
+	}
+
+	if (bandera_N==0){
+		cout << "Error: no se ha indicado el largo de la lista de entrada" << endl;
+		exit(1);
+	}
+
+	if (banderaErrorParametros>0){
+
+		if (multiplo16==false){
+			cout << "Error: el largo de la lista especificado como argumento de la opcion -N" << endl;
+			cout << "No es divisible por 16" << endl;
+			exit(1);
+		}
+
+		else{
+		cout << "Error: uno o más argumentos de alguna de las opciones no son validos" << endl;
+		exit(1);
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////
+
+	////////////////MultiWay Merge Sort//////////////////////////////
+
+	//Buffer donde se guardan los floats de entrada
+	float *line =sysReadAligned(nombreEntrada,&largoLista);
 
 	int offset;
 	//Se divide en 16 pues se visitan de a 16 
-	size=size/16;
-	for (int i=0;i<size;i++){
+	largoLista=largoLista/16;
+	for (int i=0;i<largoLista;i++){
 		offset=i*16;
-		//Para acceder a una parte del registro
-		//_mm_load_ps(&line[offset]);
+
 		//A cada grupo de 16 se le aplica el sortKernel
 		loadSortKernel(&line[offset], &line[offset+4], &line[offset+8], &line[offset+12]);
 	}
-	//size * 16 ya que es la cantidad total de registros, y no la cantidad total de grupos de 16
-	merge_sort(line, size*16);
+
+	//largoLista * 16 ya que es la cantidad total de registros, y no la cantidad total de grupos de 16
+	merge_sort(line, largoLista*16);
+
+	/////////////////////////////////////////////////////////////////
 
 	//Debug
-	/*for (int i=0; i<size*16; i++){
-		cout << line[i] << endl;
-	}*/
+	if (debug==1){
+		for (int i=0; i<largoLista*16; i++){
+			cout << line[i] << endl;
+		}
+	}
 
 	//Se escribe en el archivo de salida
 	//Considerar que el tamaño es cantidad de grupos de registros, por cantidad de grupos, por cantidad de bytes de cada registro
-	sysWrite("outputSorted.txt", &*line, size*16*4);
+	sysWrite(nombreSalida, &*line, largoLista*16*4);
+	
 	return 0;
+
 }
