@@ -10,7 +10,7 @@ test:=./test
 #sources:=$(src)/entrada.cc
 
 #cxxflags:= -g -std=c++11 -Wall
-cxxflags:= -g -std=c++11 -Wall
+cxxflags:= -g -std=c++11 -Wall -O3 -pg
 cxx:=g++
 #thread:=-lpthread
 simd:=-msse3

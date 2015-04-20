@@ -244,18 +244,13 @@ void loadSortKernel(float * a, float *b, float * c, float * d){
 	_mm_store_ps(b, entrada3);
 	_mm_store_ps(d, entrada4);
 
-	//Debug
-	//cout << a[0] << a[1] << a[2] << a[3] << endl;
-	//cout << b[0] << b[1] << b[2] << b[3] << endl;
-	//cout << c[0] << c[1] << c[2] << c[3] << endl;
-	//cout << d[0] << d[1] << d[2] << d[3] << endl;
 }
 
 /**
  * merge() 
- * Merge two sorted arrays, A with a  integers and 
- * B with b integers, into a sorted array C.
- * Fuente = http://www.cs.cityu.edu.hk/~lwang/ccs4335/mergesort.c
+ * Merge 2 arrays de flotantes de igual largo (A y B) 
+ * Y lo retorna en C
+ * Funcion Merge generica
  **/
 
  void  merge(float *A, int a, float *B, int b, float *C) {
@@ -265,25 +260,25 @@ void loadSortKernel(float * a, float *b, float * c, float * d){
   k = 0;
   while (i < a && j < b) {
     if (A[i] <= B[j]) {
-	  /* copy A[i] to C[k] and move the pointer i and k forward */
+	  /* Copia A[i] a C[k]*/
 	  C[k] = A[i];
 	  i++;
 	  k++;
     }
     else {
-      /* copy B[j] to C[k] and move the pointer j and k forward */
+      /* Copia B[j] a C[k]*/
       C[k] = B[j];
       j++;
       k++;
     }
   }
-  /* move the remaining elements in A into C */
+  /* Mueve los elementos restantes de A a C*/
   while (i < a) {
     C[k]= A[i];
     i++;
     k++;
   }
-  /* move the remaining elements in B into C */
+  /* Mueve los elementos restantes de B a C */
   while (j < b)  {
     C[k]= B[j];
     j++;
@@ -294,6 +289,7 @@ void loadSortKernel(float * a, float *b, float * c, float * d){
 /**
  * merge_sort()
  * Sort array A with n integers, using merge-sort algorithm.
+ * Funcion Merge generica
  **/
 void merge_sort(float *A, int n) {
   int i;
@@ -301,32 +297,32 @@ void merge_sort(float *A, int n) {
   int n1, n2;
 
   //Aprovecho el ordenamiento SIMD
-  //Funciona de 32 en 32
+  //Funciona de 16 en 16
 
   if (n<32)//(n < 2)
-    return;   /* the array is sorted when n=32.*/
+    return;   
   
-  /* divide A into two array A1 and A2 */
-  n1 = n / 2;   /* the number of elements in A1 */
-  n2 = n - n1;  /* the number of elements in A2 */
+  /* Se divide A a 2 arrays A1 y A2 */
+  n1 = n / 2;   /* numero de elementos de A1 */
+  n2 = n - n1;  /* numero de elementos de A2 */
 
   //Se multiplica por 4 para que queden alineados a 16
   A1 = (float*)malloc(sizeof(float)*4 * n1);
   A2 = (float*)malloc(sizeof(float)*4 * n2);
   
-  /* move the first n/2 elements to A1 */
+  /* Se mueve la primera mitad a A1 */
   for (i =0; i < n1; i++) {
     A1[i] = A[i];
   }
-  /* move the rest to A2 */
+  /* el resto a A2*/
   for (i = 0; i < n2; i++) {
     A2[i] = A[i+n1];
   }
-  /* recursive call */
+  /* Llamada recursiva */
   merge_sort(A1, n1);
   merge_sort(A2, n2);
 
-  /* conquer */
+  /* Merge */
   merge(A1, n1, A2, n2, A);
   free(A1);
   free(A2);
